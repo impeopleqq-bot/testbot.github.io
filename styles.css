@@ -1,0 +1,29 @@
+body {
+  font-family: sans-serif;
+  text-align: center;
+  background-color: #fff;
+  padding: 15px;
+  margin: 0;
+}
+
+.stats {
+  margin: 10px 0;
+}
+
+#cat-img {
+  max-width: 200px;
+  margin: 20px auto;
+  display: block;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+button {
+  padding: 8px 12px;
+}
