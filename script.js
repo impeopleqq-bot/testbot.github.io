@@ -1,3 +1,32 @@
+// Функция для получения параметра из URL
+function getQueryParam(name) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+}
+
+// Попытка загрузить сохраненное состояние при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    const savedStateParam = getQueryParam('saved_state');
+    
+    if (savedStateParam) {
+        try {
+            const savedData = JSON.parse(decodeURIComponent(savedStateParam));
+            console.log("Загружены сохраненные данные:", savedData);
+            
+            // Восстанавливаем состояние котика
+            if (savedData.day !== undefined) pet.day = savedData.day;
+            if (savedData.hour !== undefined) pet.hour = savedData.hour;
+            if (savedData.fullness !== undefined) pet.fullness = savedData.fullness;
+            if (savedData.energy !== undefined) pet.energy = savedData.energy;
+            if (savedData.mood !== undefined) pet.mood = savedData.mood;
+            
+            pet.updateUI();
+            console.log("Состояние котика успешно восстановлено");
+        } catch (e) {
+            console.error("Ошибка при загрузке сохраненного состояния:", e);
+        }
+    }
+});
 // Инициализация состояния кота
 const pet = {
   day: 0,
@@ -100,4 +129,5 @@ document.getElementById('save-btn').addEventListener('click', () => {
 });
 
 // Инициализация
+
 pet.updateUI();
