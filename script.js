@@ -1,37 +1,29 @@
-// Функция для получения параметра из URL
-function getQueryParam(name) {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get(name);
+// Функция для логирования с префиксом времени
+function logWithTime(message, data = null) {
+  const now = new Date().toISOString();
+  console.log(`[${now}] ${message}`);
+  if (data) {
+    console.log(data);
+  }
+  
+  // Дополнительно выводим в интерфейс для отладки в Telegram
+  const logElement = document.getElementById('debug-log');
+  if (logElement) {
+    const logEntry = document.createElement('div');
+    logEntry.textContent = `[${now.split('T')[1].slice(0, 8)}] ${message}`;
+    logElement.prepend(logEntry);
+    // Ограничиваем количество записей в логе
+    if (logElement.children.length > 10) {
+      logElement.removeChild(logElement.lastChild);
+    }
+  }
 }
 
-// Попытка загрузить сохраненное состояние при загрузке страницы
-document.addEventListener('DOMContentLoaded', function() {
-    const savedStateParam = getQueryParam('saved_state');
-    
-    if (savedStateParam) {
-        try {
-            const savedData = JSON.parse(decodeURIComponent(savedStateParam));
-            console.log("Загружены сохраненные данные:", savedData);
-            
-            // Восстанавливаем состояние котика
-            if (savedData.day !== undefined) pet.day = savedData.day;
-            if (savedData.hour !== undefined) pet.hour = savedData.hour;
-            if (savedData.fullness !== undefined) pet.fullness = savedData.fullness;
-            if (savedData.energy !== undefined) pet.energy = savedData.energy;
-            if (savedData.mood !== undefined) pet.mood = savedData.mood;
-            
-            pet.updateUI();
-            console.log("Состояние котика успешно восстановлено");
-        } catch (e) {
-            console.error("Ошибка при загрузке сохраненного состояния:", e);
-        }
-    }
-});
 // Инициализация состояния кота
 const pet = {
   day: 0,
   hour: 0,
-  fullness: 5,  // Было "голод", теперь "сытость"
+  fullness: 5,
   energy: 5,
   mood: 5,
 
@@ -40,6 +32,7 @@ const pet = {
     this.updateStats();
     this.updateTime();
     this.updateImage();
+    logWithTime('UI обновлено', {...this});
   },
 
   // Обновление показателей
@@ -58,11 +51,11 @@ const pet = {
   updateImage: function() {
     let state = 'happy';
     if (this.fullness <= 2) state = 'hungry';
-    else if (this.fullness <= 4) state = 'hungry';
-    else if (this.energy <= 2) state = 'tired'; // упростил для меньшего числа картинок
-    else if (this.energy <= 4) state = 'tired';
-    else if (this.mood <= 2) state = 'sad'; // упростил для меньшего числа картинок
-    else if (this.mood <= 4) state = 'sad';
+    else if (this.fullness <= 4) state = 'hungry-mid';
+    else if (this.energy <= 2) state = 'tired';
+    else if (this.energy <= 4) state = 'tired-mid';
+    else if (this.mood <= 2) state = 'sad';
+    else if (this.mood <= 4) state = 'sad-mid';
     document.getElementById('cat-img').src = `${state}.png`;
   },
 
@@ -73,6 +66,7 @@ const pet = {
       this.day += Math.floor(this.hour / 24);
       this.hour = this.hour % 24;
     }
+    logWithTime(`Время изменено: +${hours} часов`);
   },
 
   // Естественное снижение параметров со временем
@@ -80,54 +74,124 @@ const pet = {
     this.fullness = Math.max(0, this.fullness - 1);
     this.energy = Math.max(0, this.energy - 1);
     this.mood = Math.max(0, this.mood - 1);
+    logWithTime('Параметры естественно снижены');
+  },
+  
+  // Загрузка состояния из данных
+  loadState: function(state) {
+    if (!state) return;
+    
+    this.day = state.day || 0;
+    this.hour = state.hour || 0;
+    this.fullness = state.fullness || 5;
+    this.energy = state.energy || 5;
+    this.mood = state.mood || 5;
+    
+    logWithTime('Состояние загружено из сохраненных данных', state);
   }
 };
 
-// Обработчики кнопок
-document.getElementById('feed-btn').addEventListener('click', () => {
-  pet.fullness = Math.min(10, pet.fullness + 2);
-  pet.advanceTime(1);
-  pet.updateUI();
-});
+// Добавляем элемент для отображения логов в интерфейсе
+const debugSection = document.createElement('div');
+debugSection.style.marginTop = '15px';
+debugSection.style.fontSize = '0.8em';
+debugSection.style.color = '#666';
+debugSection.style.textAlign = 'left';
+debugSection.innerHTML = '<div><strong>Логи:</strong></div><div id="debug-log" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee; padding: 5px; border-radius: 4px;"></div>';
+document.body.insertBefore(debugSection, document.body.firstChild);
 
-document.getElementById('play-btn').addEventListener('click', () => {
-  pet.mood = Math.min(10, pet.mood + 3);
-  pet.energy = Math.max(0, pet.energy - 2);
-  pet.fullness = Math.max(0, pet.fullness - 1);
-  pet.advanceTime(1);
-  pet.updateUI();
-});
-
-document.getElementById('sleep-btn').addEventListener('click', () => {
-  pet.energy = Math.min(10, pet.energy + 4);
-  pet.fullness = Math.max(0, pet.fullness - 1);
-  pet.advanceTime(5);
-  pet.updateUI();
-});
-
-document.getElementById('do-nothing-btn').addEventListener('click', () => {
-  pet.decreaseAll();
-  pet.advanceTime(1);
-  pet.updateUI();
-});
+// Загрузка сохраненного состояния при запуске
+function loadSavedState() {
+  logWithTime('Попытка загрузить сохраненное состояние');
+  
+  try {
+    if (window.Telegram && window.Telegram.WebApp) {
+      logWithTime('Telegram WebApp доступен');
+      
+      // Пытаемся получить данные от бота
+      const initData = window.Telegram.WebApp.initData || '';
+      logWithTime('Init data получены', initData);
+      
+      // Извлекаем сохраненное состояние из параметров запуска
+      const params = new URLSearchParams(window.location.search);
+      const savedState = params.get('state');
+      
+      if (savedState) {
+        try {
+          const state = JSON.parse(decodeURIComponent(savedState));
+          pet.loadState(state);
+          logWithTime('Состояние успешно загружено из URL параметров');
+        } catch (e) {
+          logWithTime('Ошибка при разборе состояния из URL', e.message);
+        }
+      } else {
+        logWithTime('Состояние не найдено в URL параметрах');
+      }
+      
+      // Регистрируем обработчик получения данных от бота
+      window.Telegram.WebApp.onEvent('mainButtonClicked', function() {
+        logWithTime('Главная кнопка нажата');
+      });
+    } else {
+      logWithTime('Telegram WebApp не доступен');
+    }
+  } catch (error) {
+    logWithTime('Ошибка при загрузке состояния', error.message);
+  }
+}
 
 // Отправка данных в Telegram
 document.getElementById('save-btn').addEventListener('click', () => {
-  if (Telegram.WebApp) {
-    const data = JSON.stringify({
+  logWithTime('Нажата кнопка сохранения');
+  
+  if (window.Telegram && window.Telegram.WebApp) {
+    const data = {
       day: pet.day,
       hour: pet.hour,
       fullness: pet.fullness,
       energy: pet.energy,
       mood: pet.mood
-    });
-    Telegram.WebApp.sendData(data);
-    alert('💾 Сохранено!\nДанные переданы боту');
+    };
+    
+    try {
+      const jsonData = JSON.stringify(data);
+      logWithTime('Данные для сохранения', data);
+      
+      window.Telegram.WebApp.sendData(jsonData);
+      logWithTime('Данные отправлены в Telegram');
+      
+      // Показываем уведомление в интерфейсе вместо alert
+      const notification = document.createElement('div');
+      notification.style.position = 'fixed';
+      notification.style.bottom = '20px';
+      notification.style.left = '50%';
+      notification.style.transform = 'translateX(-50%)';
+      notification.style.backgroundColor = '#4CAF50';
+      notification.style.color = 'white';
+      notification.style.padding = '10px 20px';
+      notification.style.borderRadius = '5px';
+      notification.style.zIndex = '1000';
+      notification.textContent = '💾 Сохранено! Данные переданы боту';
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 3000);
+      
+    } catch (error) {
+      logWithTime('Ошибка при отправке данных', error.message);
+      alert(`Ошибка сохранения: ${error.message}`);
+    }
   } else {
+    logWithTime('Попытка сохранения вне Telegram');
     alert('⚠️ Работает только внутри Telegram!\nОткройте Mini App в мобильном приложении');
   }
 });
 
-// Инициализация
-
+// Инициализация приложения
+logWithTime('Приложение запускается');
+loadSavedState();
 pet.updateUI();
+
+logWithTime('Приложение инициализировано');
