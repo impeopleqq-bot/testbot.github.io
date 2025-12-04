@@ -2,9 +2,38 @@
 const pet = {
   day: 0,
   hour: 0,
-  fullness: 5,  // Было "голод", теперь "сытость"
+  fullness: 5,
   energy: 5,
   mood: 5,
+
+  // Загрузить сохранённые данные
+  load: function() {
+    const saved = localStorage.getItem('tamagotchi_pet');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        this.day = data.day || 0;
+        this.hour = data.hour || 0;
+        this.fullness = data.fullness || 5;
+        this.energy = data.energy || 5;
+        this.mood = data.mood || 5;
+      } catch (e) {
+        console.error('Ошибка загрузки:', e);
+      }
+    }
+  },
+
+  // Сохранить текущее состояние
+  save: function() {
+    const data = {
+      day: this.day,
+      hour: this.hour,
+      fullness: this.fullness,
+      energy: this.energy,
+      mood: this.mood
+    };
+    localStorage.setItem('tamagotchi_pet', JSON.stringify(data));
+  },
 
   // Обновление всех отображений
   updateUI: function() {
@@ -30,9 +59,9 @@ const pet = {
     let state = 'happy';
     if (this.fullness <= 2) state = 'hungry';
     else if (this.fullness <= 4) state = 'hungry';
-    else if (this.energy <= 2) state = 'tired'; // упростил для меньшего числа картинок
+    else if (this.energy <= 2) state = 'tired';
     else if (this.energy <= 4) state = 'tired';
-    else if (this.mood <= 2) state = 'sad'; // упростил для меньшего числа картинок
+    else if (this.mood <= 2) state = 'sad';
     else if (this.mood <= 4) state = 'sad';
     document.getElementById('cat-img').src = `${state}.png`;
   },
@@ -44,6 +73,7 @@ const pet = {
       this.day += Math.floor(this.hour / 24);
       this.hour = this.hour % 24;
     }
+    this.save(); // Автосохранение
   },
 
   // Естественное снижение параметров со временем
@@ -51,6 +81,7 @@ const pet = {
     this.fullness = Math.max(0, this.fullness - 1);
     this.energy = Math.max(0, this.energy - 1);
     this.mood = Math.max(0, this.mood - 1);
+    this.save(); // Автосохранение
   }
 };
 
@@ -99,5 +130,25 @@ document.getElementById('save-btn').addEventListener('click', () => {
   }
 });
 
-// Инициализация
+// Добавляем кнопку сброса прогресса
+const resetBtn = document.createElement('button');
+resetBtn.id = 'reset-btn';
+resetBtn.textContent = '🔄 Сбросить прогресс';
+document.querySelector('.buttons').appendChild(resetBtn);
+
+resetBtn.addEventListener('click', () => {
+  if (confirm('Вы уверены? Весь прогресс будет удалён!')) {
+    localStorage.removeItem('tamagotchi_pet');
+    pet.day = 0;
+    pet.hour = 0;
+    pet.fullness = 5;
+    pet.energy = 5;
+    pet.mood = 5;
+    pet.updateUI();
+    alert('Прогресс сброшен!');
+  }
+});
+
+// Инициализация при загрузке
+pet.load(); // Загружаем сохранённое состояние
 pet.updateUI();
